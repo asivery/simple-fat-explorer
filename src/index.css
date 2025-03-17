@@ -73,6 +73,14 @@ fieldset {
   border: 1px solid white;
 }
 
+.icon {
+  border: 1px solid white;
+  color: white;
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
 .simplebutton {
   border: 1px solid white;
   color: white;
@@ -113,4 +121,14 @@ span.text {
 
 .directory.corrupted > span.text {
   color: violet;
+}
+
+span.link {
+  color: #535bf2;
+  user-select: none;
+}
+
+span.link:hover {
+  text-decoration: underline;
+  cursor: pointer;
 }

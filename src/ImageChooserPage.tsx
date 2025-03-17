@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
-import { CachedDirectory, FatFilesystem } from 'nufatfs';
+import { CachedDirectory, FatFilesystem, FatType } from 'nufatfs';
 import { VIRTUAL_ATTRIBUTE_CORRUPTED, getNthPartitionFromMBR, isSpecial } from './util';
 
 export function ImageChooserPage({ setImageFile }: { setImageFile: (imageFile: FatFilesystem) => void }) {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const [selectedPartition, setSelectedPartition] = useState(-1);
+    const [selectedFS, setSelectedFS] = useState<FatType | undefined>(undefined);
     const [sectorSize, setSectorSize] = useState(512);
     const handleAcceptFile = useCallback(async () => {
         console.log({ selectedPartition, sectorSize });
@@ -31,7 +32,7 @@ export function ImageChooserPage({ setImageFile }: { setImageFile: (imageFile: F
                     },
                 };
             }
-            const fs = await FatFilesystem.create(driver);
+            const fs = await FatFilesystem.create(driver, false, selectedFS);
             async function cacheAllIn(root: CachedDirectory) {
                 for (let entry of await root.getEntries()) {
                     if (entry instanceof CachedDirectory && !isSpecial(entry.underlying)) {
@@ -54,7 +55,7 @@ export function ImageChooserPage({ setImageFile }: { setImageFile: (imageFile: F
             window.alert(ex);
             inputRef.current!.value = '';
         }
-    }, [selectedPartition, inputRef, setImageFile, sectorSize]);
+    }, [selectedPartition, inputRef, setImageFile, sectorSize, selectedFS]);
     const handleAskForFile = useCallback(() => {
         inputRef.current!.click();
     }, [inputRef]);
@@ -70,6 +71,15 @@ export function ImageChooserPage({ setImageFile }: { setImageFile: (imageFile: F
                     <option value={1}>MBR Parition 2</option>
                     <option value={2}>MBR Parition 3</option>
                     <option value={3}>MBR Parition 4</option>
+                </select>
+            </label>
+            <label>
+                FAT Filesystem Type:
+                <select value={selectedFS} onChange={(e) => setSelectedFS(e.target.value === null ? undefined : parseInt(e.target.value as any))}>
+                    <option value={'null'}>Autodetect</option>
+                    <option value={FatType.Fat12}>FAT 12</option>
+                    <option value={FatType.Fat16}>FAT 16</option>
+                    <option value={FatType.Fat32}>FAT 32</option>
                 </select>
             </label>
             <label>

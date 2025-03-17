@@ -1,7 +1,11 @@
 import { CachedDirectory, FatFilesystem, LowLevelFatFilesystem } from 'nufatfs';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FatFSDirectoryEntry, FatFSDirectoryEntryAttributes } from 'nufatfs/dist/types';
-import { VIRTUAL_ATTRIBUTE_CORRUPTED, capitalize, createStringChain, h, isSpecial, renderFlags } from './util';
+import { name83toNormal } from 'nufatfs/dist/utils';
+import { VIRTUAL_ATTRIBUTE_CORRUPTED, capitalize, createStringChain, downloadBlob, h, isSpecial, renderFlags } from './util';
+import PartialHexViewer from './PartialHexViewer';
+import { Chain } from 'nufatfs/dist/chained-structures';
+import { ClusterChainLink } from 'nufatfs/dist/cluster-chain';
 
 export function ExpansiveButton({ onStateChanged }: { onStateChanged: (b: boolean) => void }) {
     const [selected, setSelected] = useState(false);
@@ -54,12 +58,56 @@ export function StringifyMetadata({
     );
 }
 
+const SINGLE_EXPAND_SIZE = 1024;
+const DUMMY_CHAIN = new Chain<ClusterChainLink>([]);
+
 export function SingleNonChainedEntry({ data, ll, cls }: { data: FatFSDirectoryEntry; ll: LowLevelFatFilesystem; cls?: string }) {
     const [shown, setShown] = useState(false);
     const [chain, setChain] = useState<null | string>(null);
+    const [fileChain, setFileChain] = useState<null | Chain<ClusterChainLink>>(null);
+    const [partialData, setPartialData] = useState<Uint8Array>(new Uint8Array(0));
     useEffect(() => {
         setChain(createStringChain(ll, data._firstCluster));
     }, [ll, data]);
+
+    // When changed the basic parameters, clear:
+    useEffect(() => {
+        setPartialData(new Uint8Array(0));
+        try {
+            setFileChain(data._firstCluster > 0 ? ll.constructClusterChain(data._firstCluster, false) : DUMMY_CHAIN);
+        } catch(ex){
+            setFileChain(DUMMY_CHAIN);
+        }
+    }, [ll, data]);
+
+    // If we change the chain, load a bit more data
+    useEffect(() => {
+        if(chain) loadMore();
+    }, [chain]);
+
+    const loadMore = useCallback(async () => {
+        const cursor = partialData?.length ?? 0;
+        const toRead = fileChain!.length() - cursor > SINGLE_EXPAND_SIZE ? SINGLE_EXPAND_SIZE : fileChain!.length() - cursor;
+        const newData = new Uint8Array(cursor + toRead);
+        if(partialData) newData.set(partialData, 0);
+        await fileChain!.seek(cursor);
+        newData.set(await fileChain!.read(toRead), cursor);
+        console.log(newData);
+        setPartialData(newData);
+    }, [partialData, fileChain]);
+
+    const loadAll = useCallback(async () => {
+        await fileChain!.seek(0);
+        setPartialData(await fileChain!.readAll());
+    }, [fileChain]);
+
+    const downloadFile = useCallback(async () => {
+        await fileChain!.seek(0);
+        const allData = await fileChain!.readAll();
+        const fileName = name83toNormal(data._filenameStr);
+        downloadBlob(new Blob([allData.slice(0, data.fileSize)]), fileName);
+    }, [fileChain, data]);
+
     return (
         <div
             className={`nonchainedentry ${cls} ${data.attribs === FatFSDirectoryEntryAttributes.EqLFN ? 'lfn' : ''} ${data.attribs & VIRTUAL_ATTRIBUTE_CORRUPTED ? 'corrupted' : ''}`}
@@ -67,9 +115,19 @@ export function SingleNonChainedEntry({ data, ll, cls }: { data: FatFSDirectoryE
             <ExpansiveButton onStateChanged={setShown} />
             <span className="text">
                 File: [{data._filenameStr}], Flags: {data.attribs & ~VIRTUAL_ATTRIBUTE_CORRUPTED} {renderFlags(data.attribs)} (size:{' '}
-                {data.fileSize}) - @{h(data._firstCluster)}
+                {data.fileSize}) - @{h(data._firstCluster)} <span className='link' onClick={downloadFile}>Export</span>
             </span>
             {shown && <div className="indent">{chain}</div>}
+            {shown &&
+                <div className="indent" style={{marginTop: 20}}>
+                    File Contents (full clusters):
+                    <PartialHexViewer
+                        canLoadMore={partialData.length < data.fileSize && !(data.attribs & VIRTUAL_ATTRIBUTE_CORRUPTED)}
+                        loadAll={loadAll}
+                        loadMore={loadMore}
+                        data={partialData}/>
+                </div>
+            }
         </div>
     );
 }
@@ -82,7 +140,7 @@ export function DirectoryEntry({ entry, ll }: { entry: CachedDirectory; ll: LowL
         <div className={`directory ${corrupted && 'corrupted'}`}>
             <ExpansiveButton onStateChanged={setShown} />
             <span className="text">
-                Directory: {entry.underlying?._filenameStr ?? '<Virtual>'} {corrupted && 'CORRUPTED!'}
+                Directory: {entry.underlying?._filenameStr ?? '<Virtual>'} {corrupted ? 'CORRUPTED!' : ''}
             </span>
             {shown && (
                 <div className="indent">

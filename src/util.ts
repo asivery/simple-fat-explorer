@@ -74,3 +74,15 @@ export const VIRTUAL_ATTRIBUTE_CORRUPTED = 0x1000000;
 export function capitalize(string: string) {
     return string.charAt(0).toUpperCase() + string.replace(/([A-Z])/g, ' $1').slice(1);
 }
+
+export function downloadBlob(buffer: Blob, fileName: string) {
+    const url = URL.createObjectURL(buffer);
+    const a = document.createElement('a');
+    document.body.appendChild(a);
+    a.style.display = 'none';
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+}

@@ -1,0 +1,21 @@
+.hexView {
+    display: flex;
+    flex-direction: column;
+    background-color: black;
+    padding: 20px;
+    width: 590px;
+}
+
+.actionButtons {
+    padding-top: 20px;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    justify-content: space-around;
+    width: 50px;
+    margin: auto;
+}
+
+code {
+    white-space: pre;
+}

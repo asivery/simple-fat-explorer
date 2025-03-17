@@ -6,3 +6,4 @@ Written in TypeScript / React.
 
 Built on top of [nufatfs](https://github.com/asivery/nufatfs)
 
+The favicon and come icons come from [pixelarticons](https://github.com/halfmage/pixelarticons)
