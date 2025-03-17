@@ -75,7 +75,7 @@ export function ImageChooserPage({ setImageFile }: { setImageFile: (imageFile: F
             </label>
             <label>
                 FAT Filesystem Type:
-                <select value={selectedFS} onChange={(e) => setSelectedFS(e.target.value === null ? undefined : parseInt(e.target.value as any))}>
+                <select value={selectedFS} onChange={(e) => setSelectedFS(e.target.value === 'null' ? undefined : parseInt(e.target.value as any))}>
                     <option value={'null'}>Autodetect</option>
                     <option value={FatType.Fat12}>FAT 12</option>
                     <option value={FatType.Fat16}>FAT 16</option>
